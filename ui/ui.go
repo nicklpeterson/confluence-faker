@@ -2,17 +2,49 @@ package ui
 
 import (
 	"errors"
+	"fmt"
 	"github.com/manifoldco/promptui"
+	"github.com/nicklpeterson/confluence-faker/confluence"
 	"github.com/nicklpeterson/confluence-faker/settings"
 	"log"
 	"regexp"
 	"strings"
 )
 
-func PromptUserForConfluenceInstance(prompt string) * settings.Instance {
+func GetConfluenceInstance(url string) * confluence.Instance {
+	userSettings, err := settings.GetSettings()
+	selectedInstance := &confluence.Instance{}
+	selectedInstance.URL = ""
+	if url != "" {
+		for _, instance := range userSettings.Instances {
+			if instance.URL == url {
+				selectedInstance = &instance
+				break
+			}
+		}
+	}
+
+	if selectedInstance.URL == "" && ( err != nil ||  len(userSettings.Instances) == 0) {
+		log.Printf("%v", err)
+		// Todo: Prompt user to enter confluence information
+		selectedInstance = PromptUserForConfluenceInstance("Please add a confluence instance.")
+		err := settings.AddNewConfluenceInstance(selectedInstance)
+		if err != nil {
+			fmt.Printf("Failed to save new settings: %v\n", err)
+		}
+	} else if selectedInstance.URL == "" {
+		selectedInstance, err = SelectConfluenceInstance(userSettings)
+		if err != nil {
+			//log.Panicf("%v\n", err)
+		}
+	}
+	return selectedInstance
+}
+
+func PromptUserForConfluenceInstance(prompt string) * confluence.Instance {
 	log.Printf("%v\n", prompt)
 	url := executePrompt(promptui.Prompt{
-		Label: "Confluence URL (*.atlassian.net)",
+		Label: "confluence URL (*.atlassian.net)",
 		Validate: validateUrl,
 	})
 	email := executePrompt(promptui.Prompt{
@@ -24,24 +56,24 @@ func PromptUserForConfluenceInstance(prompt string) * settings.Instance {
 		Validate: nil,
 		HideEntered: true,
 	})
-	return &settings.Instance{
+	return &confluence.Instance{
 		URL: url,
 		Email: email,
 		ApiKey: apiKey,
 	}
 }
 
-func SelectConfluenceInstance(userSettings * settings.Settings) (* settings.Instance, error) {
+func SelectConfluenceInstance(userSettings * settings.Settings) (* confluence.Instance, error) {
 	items := make([]string, len(userSettings.Instances))
 
 	for index, instance := range userSettings.Instances {
 		items[index] = instance.URL
 	}
 
-	index, _, err := SelectFromList(items,"Select a Confluence instance for your fake data")
+	index, _, err := SelectFromList(items,"Select a confluence instance for your fake data")
 
 	if err != nil {
-		return &settings.Instance{}, errors.New("settings do not contain any confluence instances")
+		return &confluence.Instance{}, errors.New("settings do not contain any confluence instances")
 	}
 
 	return &userSettings.Instances[index], nil
@@ -72,7 +104,7 @@ func executePrompt(prompt promptui.Prompt) string {
 func executeSelect(prompt promptui.Select) (int, string) {
 	index, result, err := prompt.Run()
 	if err != nil {
-		log.Panicf("Prompt Failed %v\n", err)
+		//log.Panicf("Prompt Failed %v\n", err)
 	}
 	return index, result
 }
@@ -81,7 +113,11 @@ func validateUrl(input string) error {
 	//Todo: improve this.
 	valid := strings.HasSuffix(input, ".atlassian.net")
 	if !valid {
-		return errors.New("url must end with .atlassian.net")
+		return errors.New(`url must end with ".atlassian.net`)
+	}
+	valid = strings.HasPrefix(input, "https://")
+	if ! valid {
+		return errors.New(`url must begin with "https://""`)
 	}
 	return nil
 }

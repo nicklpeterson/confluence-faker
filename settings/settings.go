@@ -1,18 +1,13 @@
 package settings
 
 import (
+	"github.com/nicklpeterson/confluence-faker/confluence"
 	"gopkg.in/yaml.v2"
 	"io/ioutil"
 )
 
 type Settings struct {
-	Instances	[]Instance	`yaml:"confluence-instances"`
-}
-
-type Instance struct {
-	URL 	string	`yaml:"url"`
-	ApiKey  string	`yaml:"api-key"`
-	Email 	string	`yaml:"email"`
+	Instances	[]confluence.Instance `yaml:"confluence-instances"`
 }
 
 func GetSettings() (* Settings, error) {
@@ -45,7 +40,7 @@ func SaveSettings(settings * Settings) error {
 	return nil
 }
 
-func AddNewConfluenceInstance(instance * Instance) error {
+func AddNewConfluenceInstance(instance * confluence.Instance) error {
 	settings, err := GetSettings()
 	if err != nil {
 		 settings = &Settings{}

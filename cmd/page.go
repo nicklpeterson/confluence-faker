@@ -2,22 +2,25 @@ package cmd
 
 import (
 	"fmt"
-	"github.com/nicklpeterson/confluence-faker/settings"
+	"github.com/nicklpeterson/confluence-faker/generators"
 	"github.com/nicklpeterson/confluence-faker/ui"
 	"github.com/spf13/cobra"
 	"log"
+	"os"
 )
 
 // pageCmd represents the page command
 var pageCmd = &cobra.Command{
 	Use:   "page",
-	Short: "A brief description of your command",
-	Long: `A longer description that spans multiple lines and likely contains examples
-and usage of using your command. For example:
+	Short: "Generate pages in your Confluence Cloud Instance",
+	Long: `Generate random pages in a Confluence Cloud Instance
 
-Cobra is a CLI library for Go that empowers applications.
-This application is a tool to generate the needed files
-to quickly create a Cobra application.`,
+		Examples:
+			confluence-faker fake page --pages=20 #Generates 20 new pages
+			confluence-faker fake page --space=PHP #Generate 10 new pages in the space PHP
+			confluence-fakes fake page --url=example.atlassian.net #Generate 10 new pages in the specified confluence instance
+
+			Currently all pages are created at the top level.`,
 	Run: func(cmd *cobra.Command, args []string) {
 		fmt.Println("page called")
 		pages, _ := cmd.Flags().GetInt("pages")
@@ -29,36 +32,37 @@ to quickly create a Cobra application.`,
 
 func init() {
 	fakeCmd.AddCommand(pageCmd)
-
-	// Here you will define your flags and configuration settings.
-
-	// Cobra supports Persistent Flags which will work for this command
-	// and all subcommands, e.g.:
-	// pageCmd.PersistentFlags().String("foo", "", "A help for foo")
+	// Persistent Flags
 	pageCmd.PersistentFlags().String("url", "", "url of target confluence instance")
 
-	// Cobra supports local flags which will only run when this command
-	// is called directly, e.g.:
-	// pageCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
+	// local flags
 	pageCmd.Flags().Int("pages", 10, "number of pages to create in target space")
 	pageCmd.Flags().String("space", "", "target space for new pages")
 }
 
 func addFakePages(numPages int, space string, url string) {
-	userSettings, err := settings.GetSettings()
-	selectedInstance := &settings.Instance{}
-	if err != nil ||  len(userSettings.Instances) == 0 {
-		log.Printf("%v", err)
-		// Todo: Prompt user to enter confluence information
-		selectedInstance = ui.PromptUserForConfluenceInstance("Please add a confluence instance.")
-		settings.AddNewConfluenceInstance(selectedInstance)
-
-	} else {
-		selectedInstance, err = ui.SelectConfluenceInstance(userSettings)
+	selectedInstance := ui.GetConfluenceInstance(url)
+	if space == "" {
+		spaceList, err := selectedInstance.GetSpaces()
 		if err != nil {
-			log.Panicf("%v\n", err)
+			log.Printf("Unable to connect to " + url + "\nPlease check your settings and try again.")
+			os.Exit(-1)
 		}
+		items := make([]string, len(*spaceList))
+		for i, space := range *spaceList {
+			items[i] = space.Name
+		}
+		index, _, err := ui.SelectFromList(items, "Please select a target space")
+		if err != nil {
+			log.Printf("Unable to connect to " + url + "\nPlease check your settings and try again.")
+			os.Exit(-1)
+		}
+		space = (*spaceList)[index].Key
 	}
 
-
+	fakePageArray, err := generators.NewFakePageArray(space, numPages)
+	if err != nil {
+		log.Printf("Unable to generate data: %v\n", err)
+	}
+	log.Printf("%v\n", fakePageArray)
 }

@@ -7,7 +7,7 @@ import (
 )
 
 type Settings struct {
-	Instances	[]confluence.Instance `yaml:"confluence-instances"`
+	Hosts []confluence.Host `yaml:"confluence-instances"`
 }
 
 func GetSettings() (* Settings, error) {
@@ -40,13 +40,13 @@ func SaveSettings(settings * Settings) error {
 	return nil
 }
 
-func AddNewConfluenceInstance(instance * confluence.Instance) error {
+func AddNewConfluenceHost(instance * confluence.Host) error {
 	settings, err := GetSettings()
 	if err != nil {
 		 settings = &Settings{}
 	}
 
-	settings.Instances = append(settings.Instances, *instance)
+	settings.Hosts = append(settings.Hosts, *instance)
 	err = SaveSettings(settings)
 	if err != nil {
 		return err

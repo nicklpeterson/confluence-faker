@@ -2,46 +2,59 @@ package ui
 
 import (
 	"errors"
-	"fmt"
+	"github.com/briandowns/spinner"
 	"github.com/manifoldco/promptui"
 	"github.com/nicklpeterson/confluence-faker/confluence"
 	"github.com/nicklpeterson/confluence-faker/settings"
 	"log"
+	"os"
 	"regexp"
 	"strings"
+	"time"
 )
 
-func GetConfluenceInstance(url string) * confluence.Instance {
+
+func NewSpinner(loadingText string) *spinner.Spinner {
+	s := spinner.New(spinner.CharSets[9], 100*time.Millisecond)
+	if loadingText != "" {
+		s.Suffix = "  :" + loadingText
+	}
+	s.Color("fgHiGreen")
+	return s
+}
+
+func GetConfluenceHost(url string) * confluence.Host {
 	userSettings, err := settings.GetSettings()
-	selectedInstance := &confluence.Instance{}
-	selectedInstance.URL = ""
+	selectedHost := &confluence.Host{}
+	selectedHost.URL = ""
 	if url != "" {
-		for _, instance := range userSettings.Instances {
+		for _, instance := range userSettings.Hosts {
 			if instance.URL == url {
-				selectedInstance = &instance
+				selectedHost = &instance
 				break
 			}
 		}
 	}
 
-	if selectedInstance.URL == "" && ( err != nil ||  len(userSettings.Instances) == 0) {
+	if selectedHost.URL == "" && ( err != nil ||  len(userSettings.Hosts) == 0) {
 		log.Printf("%v", err)
 		// Todo: Prompt user to enter confluence information
-		selectedInstance = PromptUserForConfluenceInstance("Please add a confluence instance.")
-		err := settings.AddNewConfluenceInstance(selectedInstance)
+		selectedHost = PromptUserForConfluenceInstance("Please add a confluence instance.")
+		err := settings.AddNewConfluenceHost(selectedHost)
 		if err != nil {
-			fmt.Printf("Failed to save new settings: %v\n", err)
+			log.Printf("Failed to save new settings: %v\n", err)
 		}
-	} else if selectedInstance.URL == "" {
-		selectedInstance, err = SelectConfluenceInstance(userSettings)
+	} else if selectedHost.URL == "" {
+		selectedHost, err = SelectConfluenceHost(userSettings)
 		if err != nil {
-			//log.Panicf("%v\n", err)
+			log.Printf("An Error occured, unable to continue: \n%v\n", err)
+			os.Exit(-1)
 		}
 	}
-	return selectedInstance
+	return selectedHost
 }
 
-func PromptUserForConfluenceInstance(prompt string) * confluence.Instance {
+func PromptUserForConfluenceInstance(prompt string) * confluence.Host {
 	log.Printf("%v\n", prompt)
 	url := executePrompt(promptui.Prompt{
 		Label: "confluence URL (*.atlassian.net)",
@@ -56,27 +69,27 @@ func PromptUserForConfluenceInstance(prompt string) * confluence.Instance {
 		Validate: nil,
 		HideEntered: true,
 	})
-	return &confluence.Instance{
+	return &confluence.Host{
 		URL: url,
 		Email: email,
 		ApiKey: apiKey,
 	}
 }
 
-func SelectConfluenceInstance(userSettings * settings.Settings) (* confluence.Instance, error) {
-	items := make([]string, len(userSettings.Instances))
+func SelectConfluenceHost(userSettings * settings.Settings) (* confluence.Host, error) {
+	items := make([]string, len(userSettings.Hosts))
 
-	for index, instance := range userSettings.Instances {
-		items[index] = instance.URL
+	for index, host := range userSettings.Hosts {
+		items[index] = host.URL
 	}
 
 	index, _, err := SelectFromList(items,"Select a confluence instance for your fake data")
 
 	if err != nil {
-		return &confluence.Instance{}, errors.New("settings do not contain any confluence instances")
+		return &confluence.Host{}, errors.New("settings do not contain any confluence instances")
 	}
 
-	return &userSettings.Instances[index], nil
+	return &userSettings.Hosts[index], nil
 }
 
 func SelectFromList(items []string, prompt string) (int, string, error) {
@@ -104,19 +117,19 @@ func executePrompt(prompt promptui.Prompt) string {
 func executeSelect(prompt promptui.Select) (int, string) {
 	index, result, err := prompt.Run()
 	if err != nil {
-		//log.Panicf("Prompt Failed %v\n", err)
+		log.Panicf("Prompt Failed %v\n", err)
 	}
 	return index, result
 }
 
 func validateUrl(input string) error {
-	//Todo: improve this.
+	//TODO: accept urls without https://
 	valid := strings.HasSuffix(input, ".atlassian.net")
 	if !valid {
 		return errors.New(`url must end with ".atlassian.net`)
 	}
 	valid = strings.HasPrefix(input, "https://")
-	if ! valid {
+	if !valid {
 		return errors.New(`url must begin with "https://""`)
 	}
 	return nil

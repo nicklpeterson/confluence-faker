@@ -5,17 +5,20 @@ import (
 )
 
 type fakePage struct {
-	Id          string `faker:"uuid_digit" json:"id"`
-	Title       string `faker:"sentence" json:"title"`
-	ContentType string `json:"type"`
-	Space       string `json:"space"`
-	Status      string `faker:"oneof:current, historical, draft" json:"status"`
-	Ancestors   ancestors `json:"ancestors"`// Blank if the page is top level, else this is the parent content
-	Body        string `faker:"paragraph" json:"body"`
+	Title       string 		`faker:"uuid_digit" json:"title"`
+	ContentType string 		`faker:"-" json:"type"`
+	Status      string 		`faker:"-" json:"status"`
+	Body        body		`faker:"-" json:"body"`
+	Space		space		`faker:"-" json:"space"`
 }
 
-type ancestors []struct {
-	Id string `json:"id"`
+type body struct {
+	Value          string `faker:"paragraph" json:"value"`
+	Representation string `faker:"-" json:"representation"`
+}
+
+type space struct {
+	Key string `faker:"-" json:"key"`
 }
 
 func newFakePage(space string) (fakePage, error) {
@@ -25,7 +28,9 @@ func newFakePage(space string) (fakePage, error) {
 		return page, err
 	}
 	page.ContentType = "page"
-	page.Space = space
+	page.Space.Key = space
+	page.Body.Representation = "storage"
+	page.Status = "current"
 	return page, nil
 }
 

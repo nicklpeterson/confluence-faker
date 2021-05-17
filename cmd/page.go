@@ -2,7 +2,6 @@ package cmd
 
 import (
 	"encoding/json"
-	"fmt"
 	"github.com/nicklpeterson/confluence-faker/confluence"
 	"github.com/nicklpeterson/confluence-faker/generators"
 	"github.com/nicklpeterson/confluence-faker/logging"
@@ -12,7 +11,6 @@ import (
 	"sync"
 )
 
-// pageCmd represents the page command
 var pageCmd = &cobra.Command{
 	Use:   "page",
 	Short: "Generate pages in your Confluence Cloud Host",
@@ -25,7 +23,6 @@ var pageCmd = &cobra.Command{
 
 			Currently all pages are created at the top level.`,
 	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Println("page called")
 		pages, _ := cmd.Flags().GetInt("pages")
 		space, _ := cmd.Flags().GetString("space")
 		url, _ := cmd.Flags().GetString("url")
@@ -46,6 +43,7 @@ func init() {
 
 func addFakePages(numPages int, space string, url string, logger logging.Logger) {
 	selectedHost := ui.GetConfluenceHost(url)
+	// If a space is not specified: get the list of spaces and prompt the user to select one
 	if space == "" {
 		spaceList, err := selectedHost.GetSpaces()
 		if err != nil {
@@ -64,42 +62,39 @@ func addFakePages(numPages int, space string, url string, logger logging.Logger)
 		space = (*spaceList)[index].Key
 	}
 
-	fakePageArray, err := generators.NewFakePageArray(space, numPages)
-	if err != nil {
-		logger.Info("Unable to generate data: %v\n", err)
-	}
-
-	spinner := ui.NewSpinner("Uploading Pages")
-
+	spinner := ui.NewSpinner("Generating and Uploading Pages")
 	if !logger.Verbose {
 		spinner.Start()
 	}
-	logger.Debug("Uploading Pages ...\n")
 
 	var wg sync.WaitGroup
-
-	for index, page := range fakePageArray {
-		jsonBody, err := json.Marshal(page)
-		if err == nil {
-			wg.Add(1)
-			go worker(index, &wg, &logger, selectedHost, jsonBody)
-		} else {
-			logger.Info("Unable to create page %v, skipping", index)
-		}
+	for i := 0; i < numPages; i++ {
+		wg.Add(1)
+		go worker(i, &wg, &logger, selectedHost, space)
 	}
-
 	wg.Wait()
-	if !logger.Verbose {
+
+	if spinner.Active() {
 		spinner.Stop()
 	}
-	logger.Info("%d pages were added successfully!\n", numPages)
+	logger.Info("Done adding pages!\n")
 }
 
-func worker(id int, wg *sync.WaitGroup, logger *logging.Logger, host *confluence.Host, body []byte) {
+func worker(id int, wg *sync.WaitGroup, logger *logging.Logger, host *confluence.Host, space string) {
 	defer wg.Done()
-	status, _, err := host.Post("/wiki/rest/api/content", body)
-	logger.Debug("Worker %d: http response: %v\n", id, status)
+	page, err := generators.NewFakePage(space)
 	if err != nil {
-		logger.Info("Unable to create page %v, skipping", id)
+		logger.Info("Worker %d failed: to generate data", id)
+	} else {
+		body, err := json.Marshal(page)
+		if err == nil {
+			status, _, err := host.Post("/wiki/rest/api/content", body)
+			logger.Debug("Worker %d: http response: %v\n", id, status)
+			if err != nil {
+				logger.Info("Worker %d: Unable to create page, skipping", id)
+			}
+		} else {
+			logger.Info("Worker %d: Unable to create page, skipping", id)
+		}
 	}
 }

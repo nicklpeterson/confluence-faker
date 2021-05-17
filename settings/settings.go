@@ -7,7 +7,7 @@ import (
 )
 
 type Settings struct {
-	Hosts []confluence.Host `yaml:"confluence-instances"`
+	Hosts []confluence.Host `yaml:"confluence-hosts"`
 }
 
 func GetSettings() (* Settings, error) {

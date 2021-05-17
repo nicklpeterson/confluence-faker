@@ -21,7 +21,7 @@ type space struct {
 	Key string `faker:"-" json:"key"`
 }
 
-func newFakePage(space string) (fakePage, error) {
+func NewFakePage(space string) (fakePage, error) {
 	page := fakePage{}
 	err := faker.FakeData(&page)
 	if err != nil {
@@ -37,7 +37,7 @@ func newFakePage(space string) (fakePage, error) {
 func NewFakePageArray(space string, numPages int) ([]fakePage, error) {
 	pageArray := make([]fakePage, numPages)
 	for i := 0; i < numPages; i++ {
-		if page, err := newFakePage(space); err != nil {
+		if page, err := NewFakePage(space); err != nil {
 			return nil, err
 		} else {
 			pageArray[i] = page

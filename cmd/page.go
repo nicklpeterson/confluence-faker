@@ -1,8 +1,6 @@
 package cmd
 
 import (
-	"encoding/json"
-	"github.com/nicklpeterson/confluence-faker/confluence"
 	"github.com/nicklpeterson/confluence-faker/generators"
 	"github.com/nicklpeterson/confluence-faker/logging"
 	"github.com/nicklpeterson/confluence-faker/ui"
@@ -43,23 +41,13 @@ func init() {
 
 func addFakePages(numPages int, space string, url string, logger logging.Logger) {
 	selectedHost := ui.GetConfluenceHost(url)
-	// If a space is not specified: get the list of spaces and prompt the user to select one
 	if space == "" {
-		spaceList, err := selectedHost.GetSpaces()
+		var err error = nil
+		space, err = ui.GetConfluenceSpace(selectedHost)
 		if err != nil {
 			logger.Info("Unable to connect to " + url + "\nPlease check your settings and try again.")
 			os.Exit(-1)
 		}
-		items := make([]string, len(*spaceList))
-		for i, space := range *spaceList {
-			items[i] = space.Name
-		}
-		index, _, err := ui.SelectFromList(items, "Please select a target space")
-		if err != nil {
-			logger.Info("Unable to connect to " + url + "\nPlease check your settings and try again.")
-			os.Exit(-1)
-		}
-		space = (*spaceList)[index].Key
 	}
 
 	spinner := ui.NewSpinner("Generating and Uploading Pages")
@@ -70,7 +58,7 @@ func addFakePages(numPages int, space string, url string, logger logging.Logger)
 	var wg sync.WaitGroup
 	for i := 0; i < numPages; i++ {
 		wg.Add(1)
-		go worker(i, &wg, &logger, selectedHost, space)
+		go generators.ContentWorker(i, &wg, &logger, selectedHost, space, generators.NewFakePage)
 	}
 	wg.Wait()
 
@@ -78,23 +66,4 @@ func addFakePages(numPages int, space string, url string, logger logging.Logger)
 		spinner.Stop()
 	}
 	logger.Info("Done adding pages!\n")
-}
-
-func worker(id int, wg *sync.WaitGroup, logger *logging.Logger, host *confluence.Host, space string) {
-	defer wg.Done()
-	page, err := generators.NewFakePage(space)
-	if err != nil {
-		logger.Info("Worker %d failed: to generate data", id)
-	} else {
-		body, err := json.Marshal(page)
-		if err == nil {
-			status, _, err := host.Post("/wiki/rest/api/content", body)
-			logger.Debug("Worker %d: http response: %v\n", id, status)
-			if err != nil {
-				logger.Info("Worker %d: Unable to create page, skipping", id)
-			}
-		} else {
-			logger.Info("Worker %d: Unable to create page, skipping", id)
-		}
-	}
 }

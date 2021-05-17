@@ -23,6 +23,22 @@ func NewSpinner(loadingText string) *spinner.Spinner {
 	return s
 }
 
+func GetConfluenceSpace(host *confluence.Host) (string, error) {
+	spaceList, err := host.GetSpaces()
+	if err != nil {
+		return "", err
+	}
+	items := make([]string, len(*spaceList))
+	for i, space := range *spaceList {
+		items[i] = space.Name
+	}
+	index, _, err := SelectFromList(items, "Please select a target space")
+	if err != nil {
+		return "", err
+	}
+	return (*spaceList)[index].Key, nil
+}
+
 func GetConfluenceHost(url string) * confluence.Host {
 	userSettings, err := settings.GetSettings()
 	selectedHost := &confluence.Host{}
